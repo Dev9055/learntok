@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LearnTok</title>
+    <style>
+        /* --- RESET & BASE --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            background-color: #121212; 
+            color: white; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            margin: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+        }
+        
+        #app-container { 
+            width: 100%; 
+            max-width: 420px; 
+            height: 100vh; 
+            background-color: #000; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+            border-left: 1px solid #333; 
+            border-right: 1px solid #333; 
+            overflow: hidden; 
+        }
+
+        /* --- VIEWS --- */
+        .view {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow-y: auto;
+            height: 100%;
+            background-color: #000;
+            padding-bottom: 60px; /* Space for nav */
+        }
+        .view.active-view { display: flex; animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* --- FEED --- */
+        #feed-content { flex: 1; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+        #feed-content::-webkit-scrollbar { display: none; }
+        
+        .reel { 
+            height: 100%; width: 100%; scroll-snap-align: start; 
+            position: relative; display: flex; align-items: center; justify-content: center; 
+            border-bottom: 1px solid #222; 
+        }
+        .reel-container { flex: 1; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+        .reel-container::-webkit-scrollbar { display: none; }
+
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* --- OVERLAYS --- */
+        .top-bar { 
+            position: absolute; top: 0; width: 100%; padding: 15px; z-index: 10; 
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); 
+            display: flex; justify-content: space-between; pointer-events: none;
+        }
+        .top-bar * { pointer-events: auto; }
+
+        .action-sidebar { 
+            position: absolute; right: 10px; bottom: 100px; 
+            display: flex; flex-direction: column; gap: 20px; z-index: 5; align-items: center; 
+        }
+        .action-btn { 
+            background: rgba(0, 0, 0, 0.4); border: none; color: white; 
+            border-radius: 50%; width: 45px; height: 45px; 
+            display: flex; align-items: center; justify-content: center; 
+            backdrop-filter: blur(5px); cursor: pointer; font-size: 1.4rem; 
+            transition: transform 0.1s;
+        }
+        .action-btn:active { transform: scale(0.9); }
+        .liked { color: #ff2d55 !important; }
+        .bookmarked { color: #ffc107 !important; }
+        .action-label { font-size: 0.7rem; font-weight: 600; margin-top: 4px; text-shadow: 0 1px 2px black; }
+
+        .info-overlay { 
+            position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; padding-bottom: 80px; 
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); pointer-events: none; 
+        }
+        .info-overlay * { pointer-events: auto; }
+        
+        /* --- PROFILE --- */
+        .profile-header { background: linear-gradient(135deg, #0d6efd, #6610f2); padding: 30px 20px; text-align: center; position: relative; }
+        .profile-avatar { width: 80px; height: 80px; background: #ddd; border-radius: 50%; margin: 0 auto 10px; border: 3px solid #121212; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #333; }
+        
+        .edit-icon { position: absolute; top: 15px; right: 15px; cursor: pointer; background: rgba(0,0,0,0.3); border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border:none; color: white; transition: background 0.2s; }
+        .edit-icon:hover { background: rgba(0,0,0,0.5); }
+        .edit-form { display: none; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
+        
+        /* Stats */
+        .stats-container { display: flex; justify-content: space-around; padding: 20px 10px; border-bottom: 1px solid #222; }
+        .stat-box { text-align: center; cursor: pointer; }
+        .stat-val { font-size: 1.2rem; font-weight: bold; display: block; }
+        .stat-label { font-size: 0.8rem; color: #aaa; }
+
+        /* Public Actions */
+        .profile-actions { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        .action-btn-small { 
+            background: rgba(255,255,255,0.15); border: none; color: white; 
+            padding: 8px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;
+            transition: background 0.2s; flex: 1; max-width: 120px;
+        }
+        .action-btn-small.primary { background: #0d6efd; color: white; }
+        .action-btn-small:hover { opacity: 0.9; }
+
+        /* Courses */
+        .courses-section { padding: 15px; }
+        .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .courses-scroll { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; }
+        .courses-scroll::-webkit-scrollbar { display: none; }
+        
+        .course-card { 
+            min-width: 110px; background: #1e1e1e; padding: 12px; border-radius: 10px; 
+            position: relative; text-align: center; cursor: pointer; border: 1px solid #333;
+            transition: border-color 0.2s;
+        }
+        .course-card.active { border-color: #0d6efd; background: #2a2a2a; }
+        .course-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .course-title { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .course-del { position: absolute; top: 2px; right: 2px; color: #ff4444; background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0 5px; }
+
+        /* Filter Header */
+        #filter-header {
+            background-color: #1e1e1e; padding: 12px 15px; display: none; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;
+            animation: fadeIn 0.2s;
+        }
+        .filter-title-text { font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 5px; color: #fff; }
+        .filter-back-btn { 
+            color: #ccc; background: rgba(255,255,255,0.1); border: none; 
+            font-size: 0.85rem; font-weight: bold; cursor: pointer; 
+            padding: 5px 12px; border-radius: 15px;
+        }
+
+        /* Video Grid */
+        .profile-tabs { display: flex; border-bottom: 1px solid #222; }
+        .tab-btn { flex: 1; background: none; border: none; color: #777; padding: 12px; font-weight: 600; cursor: pointer; }
+        .tab-btn.active { color: white; border-bottom: 2px solid white; }
+
+        .video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+        .grid-item { position: relative; aspect-ratio: 9/16; background: #222; cursor: pointer; }
+        .grid-item video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Action Buttons on Grid Items (Delete / Remove) */
+        .grid-action-btn { 
+            position: absolute; top: 2px; right: 2px; 
+            background: rgba(0,0,0,0.6); color: white; border: none; 
+            width: 24px; height: 24px; border-radius: 50%; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center; 
+            font-size: 0.9rem; z-index: 5; font-weight: bold;
+        }
+        .btn-remove { color: #ffc107; } /* Yellow for removing bookmark */
+        .btn-delete { color: #ff4444; } /* Red for deleting upload */
+
+        /* --- REEL PLAYER VIEW --- */
+        #view-reels .top-bar { background: transparent; z-index: 20; }
+        .back-nav-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; text-shadow: 0 1px 3px black; }
+
+        /* --- BOTTOM SHEETS --- */
+        .bottom-sheet {
+            position: absolute; top: auto; bottom: 0; left: 0; width: 100%; height: auto; max-height: 70vh;
+            background-color: #1e1e1e; z-index: 100; border-radius: 16px 16px 0 0;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex; flex-direction: column; box-shadow: 0 -5px 30px rgba(0,0,0,0.5);
+        }
+        .bottom-sheet.active { transform: translateY(0); }
+        .sheet-header { padding: 15px; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: center; position: relative; }
+        .sheet-close { position: absolute; right: 15px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; }
+        
+        .course-select-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .course-select-item:active { background: #333; }
+
+        /* --- FORMS --- */
+        .form-group { margin-bottom: 15px; }
+        .form-input { width: 100%; padding: 12px; background: #2c2c2c; border: 1px solid #333; color: white; border-radius: 8px; font-size: 1rem; }
+        .btn-primary { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        
+        /* --- NAV --- */
+        .bottom-nav { 
+            height: 60px; background-color: #000; border-top: 1px solid #222; 
+            display: flex; justify-content: space-around; align-items: center; z-index: 50; 
+            position: absolute; bottom: 0; width: 100%;
+        }
+        .nav-item { background: none; border: none; color: #666; font-size: 1.6rem; cursor: pointer; padding: 10px; }
+        .nav-item.active { color: white; }
+        
+        /* --- UTILS --- */
+        #toast { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); color: black; padding: 8px 20px; border-radius: 20px; display: none; z-index: 300; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .tag { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-right: 5px; }
+        .creator-link { cursor: pointer; font-weight: bold; text-decoration: none; color: white; }
+        
+        /* --- COMMENTS UI --- */
+        .comments-sheet-custom {
+            height: 70vh !important;
+            background-color: #121212;
+        }
+        .comments-list { 
+            flex: 1; overflow-y: auto; padding: 15px; 
+            background: #121212;
+        }
+        .comment-item { 
+            margin-bottom: 15px; font-size: 0.95rem; line-height: 1.4; 
+            display: flex; flex-direction: column;
+        }
+        .comment-user { font-weight: bold; color: #ccc; font-size: 0.85rem; margin-bottom: 2px; }
+        .comment-text { color: white; }
+        
+        .comment-input-area { 
+            padding: 15px; 
+            border-top: 1px solid #333; 
+            display: flex; gap: 10px; 
+            background: #1e1e1e; 
+            align-items: center;
+        }
+        .comment-input { 
+            flex: 1; 
+            background: #333; 
+            border: 1px solid #444; 
+            padding: 12px 20px; 
+            border-radius: 25px; 
+            color: white; 
+            outline: none; 
+            font-size: 0.95rem;
+        }
+        .comment-input:focus { border-color: #0d6efd; }
+        .comment-send { 
+            background: #0d6efd; 
+            color: white; 
+            width: 45px; height: 45px; 
+            border-radius: 50%; 
+            border: none; 
+            font-weight: bold; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+        .comment-send:active { transform: scale(0.9); }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="toast">Message</div>
+
+    <!-- === VIEW 1: HOME FEED === -->
+    <div id="view-home" class="view active-view">
+        <div class="top-bar">
+            <div style="font-weight:800;">Learn<span style="color:#0d6efd;">Tok</span></div>
+        </div>
+        <div id="feed-content" class="reel-container"></div>
+    </div>
+
+    <!-- === VIEW 2: REEL PLAYER === -->
+    <div id="view-reels" class="view" style="z-index: 60;">
+        <div class="top-bar">
+            <button class="back-nav-btn" onclick="exitReelMode()">←</button>
+            <div style="font-weight:bold; text-shadow:0 1px 3px black;" id="reel-view-title">Reels</div>
+            <div style="width:30px"></div>
+        </div>
+        <div id="reels-content" class="reel-container"></div>
+    </div>
+
+    <!-- === VIEW 3: UPLOAD === -->
+    <div id="view-upload" class="view">
+        <div class="profile-header" style="background: #1e1e1e; text-align: center; border-bottom: 1px solid #333;">
+            <h3 style="margin:0;">Upload Reel</h3>
+        </div>
+        <div style="padding: 20px;">
+            <div class="form-group"><input type="text" id="up-title" class="form-input" placeholder="Title"></div>
+            <div class="form-group"><input type="text" id="up-desc" class="form-input" placeholder="Description"></div>
+            <div class="form-group"><input type="text" id="up-tags" class="form-input" placeholder="#tags"></div>
+            <div class="form-group"><input type="file" id="up-file" class="form-input" accept="video/*"></div>
+            <button class="btn-primary" onclick="uploadVideo()">Post</button>
+            <div id="upload-status" style="margin-top:15px; text-align:center; color:#aaa;"></div>
+        </div>
+    </div>
+
+    <!-- === VIEW 4: MY PROFILE === -->
+    <div id="view-profile" class="view">
+        <div class="profile-header">
+            <button class="edit-icon" onclick="enableEdit()">✎</button>
+            <div class="profile-avatar">👤</div>
+            <div id="profile-display">
+                <h2 id="prof-name" style="margin:5px 0 0 0;">User</h2>
+                <div style="opacity:0.8; font-size: 0.9rem;" id="prof-level">Novice</div>
+            </div>
+            <div id="profile-edit" class="edit-form">
+                <input type="text" id="edit-name" class="form-input" placeholder="Username" style="margin-bottom:5px;">
+                <input type="text" id="edit-level" class="form-input" placeholder="Level/Bio" style="margin-bottom:5px;">
+                <button class="action-btn-small primary" onclick="saveProfile()">Save</button>
+            </div>
+        </div>
+        
+        <div class="stats-container">
+            <div class="stat-box"><span class="stat-val" id="prof-followers">0</span><span class="stat-label">Followers</span></div>
+            <div class="stat-box"><span class="stat-val" id="prof-following">0</span><span class="stat-label">Following</span></div>
+            <div class="stat-box"><span class="stat-val" id="prof-streak">0</span><span class="stat-label">Streak</span></div>
+        </div>
+
+        <div class="courses-section">
+            <div class="section-title">
+                <span style="font-weight:bold; color:#ccc;">My Courses</span>
+                <button onclick="openSheet('create-course-sheet')" style="background:none; border:none; color:#0d6efd; cursor:pointer; font-weight:bold;">+ Add</button>
+            </div>
+            <div class="courses-scroll" id="courses-list"></div>
+        </div>
+        
+        <div class="profile-tabs">
+            <button class="tab-btn active" onclick="switchProfileTab('uploads')">Videos</button>
+            <button class="tab-btn" onclick="switchProfileTab('bookmarks')">Saved</button>
+        </div>
+
+        <!-- Filter Header -->
+        <div id="filter-header">
+            <span id="filter-title" class="filter-title-text"></span>
+            <button onclick="clearFilter()" class="filter-back-btn">← Back to All</button>
+        </div>
+
+        <div id="my-videos-list" class="video-grid"></div>
+        <div style="padding:20px; text-align:center;">
+            <button onclick="logout()" style="color:#ff4444; background:none; border:1px solid #333; padding:10px 20px; border-radius:20px; font-size:0.9rem;">Log Out</button>
+        </div>
+    </div>
+
+    <!-- === VIEW 5: PUBLIC PROFILE === -->
+    <div id="view-public-profile" class="view">
+        <div class="profile-header">
+            <button onclick="switchTab('home')" class="back-btn" style="position:absolute; left:15px; top:15px; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">←</button>
+            <div class="profile-avatar">👤</div>
+            <h2 id="pub-name" style="margin:5px 0 0 0;">User</h2>
+            <div style="opacity:0.8; font-size: 0.9rem;" id="pub-level">Novice</div>
+            
+            <div class="profile-actions">
+                <button id="follow-btn" class="action-btn-small primary" onclick="toggleFollow()">Follow</button>
+                <button class="action-btn-small" onclick="alert('Message feature coming soon!')">Message</button>
+            </div>
+        </div>
+        <div class="stats-container">
+            <div class="stat-box"><span class="stat-val" id="pub-followers">0</span><span class="stat-label">Followers</span></div>
+            <div class="stat-box"><span class="stat-val" id="pub-following">0</span><span class="stat-label">Following</span></div>
+            <div class="stat-box"><span class="stat-val" id="pub-streak">0</span><span class="stat-label">Streak</span></div>
+        </div>
+        <div style="padding:10px 15px; border-bottom:1px solid #222;"><span style="font-weight:bold; color:#ccc;">Videos</span></div>
+        <div id="pub-videos-list" class="video-grid"></div>
+    </div>
+
+    <!-- BOTTOM SHEET: COMMENTS -->
+    <div id="comments-sheet" class="bottom-sheet comments-sheet-custom">
+        <div class="sheet-header">
+            <span style="font-weight:bold;">Comments</span>
+            <button class="sheet-close" onclick="closeSheet('comments-sheet')">×</button>
+        </div>
+        <div class="comments-list" id="comments-list"></div>
+        <div class="comment-input-area">
+            <input type="text" id="comment-input" class="comment-input" placeholder="Add a comment...">
+            <button class="comment-send" onclick="postComment()">➤</button>
+        </div>
+    </div>
+
+    <!-- BOTTOM SHEET: SAVE TO COURSE -->
+    <div id="bookmark-sheet" class="bottom-sheet">
+        <div class="sheet-header">
+            <span style="font-weight:bold;">Save to...</span>
+            <button class="sheet-close" onclick="closeSheet('bookmark-sheet')">×</button>
+        </div>
+        <div style="padding: 0 0 20px 0; overflow-y: auto;" id="bookmark-course-list"></div>
+    </div>
+
+    <!-- BOTTOM SHEET: CREATE COURSE -->
+    <div id="create-course-sheet" class="bottom-sheet">
+        <div class="sheet-header">
+            <span style="font-weight:bold;">New Course</span>
+            <button class="sheet-close" onclick="closeSheet('create-course-sheet')">×</button>
+        </div>
+        <div style="padding: 20px;">
+            <div class="form-group"><input type="text" id="course-title" class="form-input" placeholder="Course Title (e.g. Math 101)"></div>
+            <div class="form-group"><input type="text" id="course-subject" class="form-input" placeholder="Subject"></div>
+            <button class="btn-primary" onclick="createCourse()">Create Course</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('home', this)">🏠</button>
+        <button class="nav-item">🔍</button>
+        <button class="nav-item" style="color:white; font-size:2.5rem; line-height:0; margin-bottom:5px;" onclick="switchTab('upload', this)">+</button>
+        <button class="nav-item">💬</button>
+        <button class="nav-item" onclick="switchTab('profile', this)">👤</button>
+    </div>
+</div>
+
+<script>
+    const userId = localStorage.getItem('user_id');
+    if (!userId) window.location.href = '/login';
+
+    let myBookmarks = [];
+    let myUploads = [];
+    let myCourses = [];
+    let currentVideoId = null; 
+    let viewingUserId = null;
+    let currentProfileTab = 'uploads'; 
+
+    document.addEventListener('DOMContentLoaded', () => { 
+        fetchFeed(); 
+        fetch('/api/profile', { headers: getHeaders() })
+            .then(res => res.json())
+            .then(data => { myCourses = data.courses; });
+    });
+
+    function getHeaders() { return { 'X-User-ID': userId, 'Content-Type': 'application/json' }; }
+    function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+
+    function switchTab(tab, btn) {
+        if(btn) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); btn.classList.add('active'); }
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
+        document.querySelectorAll('video').forEach(v => v.pause()); 
+
+        if(tab === 'home') document.getElementById('view-home').classList.add('active-view');
+        if(tab === 'upload') document.getElementById('view-upload').classList.add('active-view');
+        if(tab === 'profile') { document.getElementById('view-profile').classList.add('active-view'); loadProfileData(); }
+    }
+
+    // --- REEL PLAYER LOGIC ---
+    function openReelMode(videos, startIndex) {
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
+        document.getElementById('view-reels').classList.add('active-view');
+        
+        const container = document.getElementById('reels-content');
+        container.innerHTML = '';
+        
+        videos.forEach((v, idx) => {
+            const el = createReelElement(v);
+            el.id = `reel-${idx}`;
+            container.appendChild(el);
+        });
+        
+        setTimeout(() => { document.getElementById(`reel-${startIndex}`).scrollIntoView({behavior: "auto"}); }, 10);
+        setupVideoObserver();
+    }
+
+    function exitReelMode() {
+        document.getElementById('view-reels').classList.remove('active-view');
+        if(viewingUserId && viewingUserId != userId) {
+            document.getElementById('view-public-profile').classList.add('active-view');
+        } else {
+            document.getElementById('view-profile').classList.add('active-view');
+        }
+        document.querySelector('#reels-content').innerHTML = ''; 
+    }
+
+    function createReelElement(video) {
+        const div = document.createElement('div');
+        div.className = 'reel';
+        const likeClass = video.liked_by_me ? 'liked' : '';
+        const bookClass = video.bookmarked_by_me ? 'bookmarked' : '';
+        
+        div.innerHTML = `
+            <video src="${video.video_url}" loop playsinline muted onclick="this.paused?this.play():this.pause()"></video>
+            <div class="action-sidebar">
+                <div style="text-align:center;">
+                    <button class="action-btn ${likeClass}" onclick="likeVideo(${video.id}, this)">♥</button>
+                    <span class="action-label">${video.likes}</span>
+                </div>
+                <div style="text-align:center; margin-top:10px;">
+                    <button class="action-btn" onclick="openComments(${video.id})">💬</button>
+                    <span class="action-label">Chat</span>
+                </div>
+                <div style="text-align:center; margin-top:10px;">
+                    <button class="action-btn ${bookClass}" onclick="openBookmarkMenu(${video.id})">★</button>
+                    <span class="action-label">Save</span>
+                </div>
+            </div>
+            <div class="info-overlay">
+                <h3 class="creator-link" onclick="openPublicProfile(${video.user_id})">@${video.creator}</h3>
+                <p>${video.description}</p>
+            </div>`;
+        return div;
+    }
+
+    // --- FEED LOGIC ---
+    async function fetchFeed() {
+        try {
+            const res = await fetch('/api/feed', { headers: getHeaders() });
+            const data = await res.json();
+            const container = document.getElementById('feed-content');
+            container.innerHTML = '';
+            data.forEach(v => container.appendChild(createReelElement(v)));
+            setupVideoObserver();
+        } catch (e) { console.error("Feed Error:", e); }
+    }
+
+    // --- PROFILE LOGIC ---
+    async function loadProfileData() {
+        const res = await fetch('/api/profile', { headers: getHeaders() });
+        const data = await res.json();
+        
+        const u = data.user;
+        document.getElementById('prof-name').innerText = u.username;
+        document.getElementById('prof-level').innerText = u.level;
+        document.getElementById('prof-followers').innerText = u.followers || 0;
+        document.getElementById('prof-following').innerText = u.following || 0;
+        document.getElementById('prof-streak').innerText = u.streak || 0;
+        
+        myCourses = data.courses;
+        renderCoursesList();
+        
+        myUploads = data.videos;
+        myBookmarks = data.bookmarks;
+        
+        // If not filtering, show current tab content
+        if(document.getElementById('filter-header').style.display === 'none') {
+            // Default to 'delete' for uploads, 'remove' for bookmarks
+            const actionType = currentProfileTab === 'uploads' ? 'delete' : 'remove';
+            renderGrid(currentProfileTab === 'uploads' ? myUploads : myBookmarks, 'my-videos-list', actionType);
+        }
+    }
+
+    function renderCoursesList() {
+        const list = document.getElementById('courses-list');
+        list.innerHTML = '';
+        if(myCourses.length === 0) list.innerHTML = '<span style="color:#666; padding:10px; font-size:0.9rem;">No courses yet.</span>';
+        myCourses.forEach(c => {
+            const safeTitle = c.title.replace(/'/g, "\\'");
+            list.innerHTML += `
+                <div class="course-card" id="course-${c.id}" onclick="filterByCourse(${c.id}, '${safeTitle}')">
+                    <button class="course-del" onclick="event.stopPropagation(); deleteCourse(${c.id})">×</button>
+                    <div class="course-icon">📚</div>
+                    <div class="course-title">${c.title}</div>
+                </div>`;
+        });
+    }
+
+    // --- COURSE FILTERING ---
+    async function filterByCourse(cid, title) {
+        document.querySelectorAll('.course-card').forEach(c => c.classList.remove('active'));
+        document.getElementById(`course-${cid}`).classList.add('active');
+
+        document.getElementById('filter-header').style.display = 'flex';
+        document.getElementById('filter-title').innerHTML = "📂 " + title;
+        
+        const res = await fetch(`/api/courses/${cid}/videos`, { headers: getHeaders() });
+        const data = await res.json();
+        
+        if(data.success) {
+            // In course view, show 'remove' button (cut) to remove from course
+            renderGrid(data.videos, 'my-videos-list', 'remove'); 
+        }
+    }
+
+    function clearFilter() {
+        document.querySelectorAll('.course-card').forEach(c => c.classList.remove('active'));
+        document.getElementById('filter-header').style.display = 'none';
+        document.getElementById('filter-title').innerText = "";
+        
+        // Reset grid to current tab's mode
+        const actionType = currentProfileTab === 'uploads' ? 'delete' : 'remove';
+        renderGrid(currentProfileTab === 'uploads' ? myUploads : myBookmarks, 'my-videos-list', actionType);
+    }
+
+    function switchProfileTab(tab) {
+        currentProfileTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        clearFilter(); // Ensure no filter is active when switching tabs
+    }
+
+    function renderGrid(videos, containerId, actionType) {
+        const grid = document.getElementById(containerId);
+        grid.innerHTML = '';
+        if(!videos || videos.length === 0) { grid.innerHTML = '<div style="color:#666; padding:20px; grid-column:span 3; text-align:center;">Empty</div>'; return; }
+        
+        videos.forEach((v, idx) => {
+            let btnHtml = '';
+            if (actionType === 'delete') {
+                // Trash Icon for deleting uploads
+                btnHtml = `<button class="grid-action-btn btn-delete" onclick="event.stopPropagation(); deleteVideo(${v.id})">🗑</button>`;
+            } else if (actionType === 'remove') {
+                // Cut/Minus Icon for removing from saved/course
+                btnHtml = `<button class="grid-action-btn btn-remove" onclick="event.stopPropagation(); removeFromCourse(${v.id})">✖</button>`;
+            }
+
+            const div = document.createElement('div');
+            div.className = 'grid-item';
+            div.innerHTML = `<video src="${v.video_url}#t=0.1" preload="metadata"></video>${btnHtml}`;
+            div.onclick = () => openReelMode(videos, idx); 
+            grid.appendChild(div);
+        });
+    }
+
+    // --- PUBLIC PROFILE ---
+    async function openPublicProfile(oid) {
+        if(oid == userId) { switchTab('profile'); return; }
+        viewingUserId = oid;
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
+        document.getElementById('view-public-profile').classList.add('active-view');
+        
+        const res = await fetch(`/api/user/${oid}`, { headers: getHeaders() });
+        const data = (await res.json());
+        if(data.success) {
+            const u = data.user;
+            document.getElementById('pub-name').innerText = u.username;
+            document.getElementById('pub-level').innerText = u.level;
+            document.getElementById('pub-followers').innerText = u.followers || 0;
+            document.getElementById('pub-following').innerText = u.following || 0;
+            document.getElementById('pub-streak').innerText = u.streak || 0;
+            
+            const btn = document.getElementById('follow-btn');
+            if(u.is_following) { btn.innerText = "Unfollow"; btn.classList.remove('primary'); }
+            else { btn.innerText = "Follow"; btn.classList.add('primary'); }
+
+            renderGrid(data.videos, 'pub-videos-list', null); // No delete/remove buttons on public profile
+        }
+    }
+
+    async function toggleFollow() {
+        const res = await fetch(`/api/follow/${viewingUserId}`, { method: 'POST', headers: getHeaders() });
+        const data = await res.json();
+        if(data.success) {
+            const btn = document.getElementById('follow-btn');
+            if (data.action === 'followed') { btn.innerText = "Unfollow"; btn.classList.remove('primary'); }
+            else { btn.innerText = "Follow"; btn.classList.add('primary'); }
+        }
+    }
+
+    // --- INTERACTIONS ---
+    function openBookmarkMenu(vid) {
+        currentVideoId = vid;
+        openSheet('bookmark-sheet');
+        const list = document.getElementById('bookmark-course-list');
+        list.innerHTML = `<div class="course-select-item" onclick="saveBookmark(null)"><span>📂 General (No Course)</span><span>➔</span></div>`;
+        myCourses.forEach(c => {
+            const safeTitle = c.title.replace(/'/g, "\\'");
+            list.innerHTML += `<div class="course-select-item" onclick="saveBookmark(${c.id})"><span>📚 ${c.title}</span><span style="color:#0d6efd;">Save</span></div>`;
+        });
+    }
+    async function saveBookmark(cid) {
+        const res = await fetch(`/api/bookmark/${currentVideoId}`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({course_id: cid}) });
+        if((await res.json()).success) { closeSheet('bookmark-sheet'); showToast('Saved!'); }
+    }
+    
+    // New function to remove bookmark/remove from course
+    async function removeFromCourse(vidId) {
+        if(!confirm("Remove this saved video?")) return;
+        // Sending no course_id to bookmark endpoint removes it if it exists
+        // or we can implement a specific remove logic, but toggling/removing is standard behavior for the existing API logic 
+        // based on app.py logic: if exists -> delete.
+        const res = await fetch(`/api/bookmark/${vidId}`, { 
+            method: 'POST', 
+            headers: getHeaders(), 
+            body: JSON.stringify({course_id: null}) // Logic in app.py handles delete if exists and no course_id sent or handled as toggle
+        });
+        
+        if((await res.json()).success) { 
+            showToast("Removed"); 
+            // Refresh current view
+            if(document.getElementById('filter-header').style.display !== 'none') {
+                 // If inside a course, we need to refresh that course's view. 
+                 // Simplest is to reload profile data but keep filter active? 
+                 // Actually just reloading profile data clears filter. 
+                 // Let's just remove the element from DOM for smoothness.
+                 // But we need to know which element. 
+                 // For MVP, reload profile is safest.
+                 loadProfileData(); // This resets view, might need to navigate back to course manually. 
+                 // Better UX: just reload profile and let user navigate. Or remove from DOM:
+                 // document.querySelector(`div[onclick*="removeFromCourse(${vidId})"]`).closest('.grid-item').remove();
+                 // Since we are refreshing logic, let's just call loadProfileData() which resets to main tab lists.
+            } else {
+                 loadProfileData();
+            }
+        }
+    }
+
+    async function likeVideo(id, btn) {
+        btn.classList.toggle('liked');
+        let c = btn.nextElementSibling; c.innerText = parseInt(c.innerText) + (btn.classList.contains('liked')?1:-1);
+        await fetch(`/api/like/${id}`, { method: 'POST', headers: getHeaders() });
+    }
+    
+    async function uploadVideo() {
+        const f = document.getElementById('up-file').files[0];
+        if(!f) return alert("File?");
+        const d = new FormData();
+        d.append('video', f); d.append('title', document.getElementById('up-title').value);
+        d.append('description', document.getElementById('up-desc').value); d.append('tags', document.getElementById('up-tags').value);
+        document.getElementById('upload-status').innerText = "Uploading...";
+        const res = await fetch('/api/upload', { method: 'POST', body: d, headers: {'X-User-ID': userId} });
+        if((await res.json()).success) { 
+            document.getElementById('upload-status').innerText = ""; 
+            switchTab('home', document.querySelector('.nav-item')); fetchFeed();
+        }
+    }
+
+    async function createCourse() {
+        const t = document.getElementById('course-title').value;
+        const s = document.getElementById('course-subject').value;
+        await fetch('/api/courses', { method: 'POST', headers: getHeaders(), body: JSON.stringify({title: t, subject: s}) });
+        closeSheet('create-course-sheet'); loadProfileData();
+    }
+
+    async function deleteCourse(id) {
+        if(confirm("Delete course?")) { await fetch(`/api/courses/${id}`, { method: 'DELETE', headers: getHeaders() }); loadProfileData(); }
+    }
+
+    async function deleteVideo(id) {
+        if(confirm("Delete video permanently?")) {
+            const res = await fetch(`/api/delete/${id}`, { method: 'POST', headers: getHeaders() });
+            if((await res.json()).success) loadProfileData();
+        }
+    }
+
+    async function openComments(vid) {
+        currentVideoId = vid;
+        openSheet('comments-sheet');
+        const list = document.getElementById('comments-list');
+        list.innerHTML = '<div style="color:#666;text-align:center;margin-top:20px;">Loading...</div>';
+        
+        const res = await fetch(`/api/comments/${vid}`);
+        const data = await res.json();
+        list.innerHTML = '';
+        if(data.length === 0) list.innerHTML = '<div style="color:#666;text-align:center;margin-top:20px;">No comments yet</div>';
+        
+        data.forEach(c => {
+            list.innerHTML += `
+                <div class="comment-item">
+                    <span class="comment-user">${c.username}</span>
+                    <span class="comment-text">${c.text}</span>
+                </div>`;
+        });
+    }
+    async function postComment() {
+        const t = document.getElementById('comment-input').value;
+        if(!t) return;
+        await fetch(`/api/comments/${currentVideoId}`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({text: t}) });
+        document.getElementById('comment-input').value = '';
+        openComments(currentVideoId);
+    }
+
+    function openSheet(id) { document.getElementById(id).classList.add('active'); }
+    function closeSheet(id) { document.getElementById(id).classList.remove('active'); }
+    
+    function setupVideoObserver() {
+        const obs = new IntersectionObserver(e => {
+            e.forEach(entry => {
+                const v = entry.target.querySelector('video');
+                const view = entry.target.closest('.view');
+                if(v && view && view.classList.contains('active-view')) {
+                    entry.isIntersecting ? v.play().catch(()=>{}) : v.pause();
+                } else if (v) { v.pause(); }
+            });
+        }, { threshold: 0.6 });
+        document.querySelectorAll('.reel').forEach(r => obs.observe(r));
+    }
+
+    function enableEdit() { 
+        document.getElementById('profile-display').style.display='none'; 
+        document.getElementById('profile-edit').style.display='block';
+        document.getElementById('edit-name').value = document.getElementById('prof-name').innerText;
+        document.getElementById('edit-level').value = document.getElementById('prof-level').innerText;
+    }
+    async function saveProfile() {
+        const username = document.getElementById('edit-name').value;
+        const level = document.getElementById('edit-level').value;
+        await fetch('/api/profile/update', { 
+            method: 'POST', headers: {...getHeaders(), 'Content-Type':'application/json'},
+            body: JSON.stringify({username, level})
+        });
+        document.getElementById('prof-name').innerText = username;
+        document.getElementById('prof-level').innerText = level;
+        document.getElementById('profile-display').style.display='block'; 
+        document.getElementById('profile-edit').style.display='none';
+    }
+    function logout() { localStorage.clear(); window.location.href = '/login'; }
+</script>
+</body>
+</html>

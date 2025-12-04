@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - LearnTok</title>
+    <style>
+        /* --- RESET & BASE --- */
+        * { box-sizing: border-box; }
+        body { 
+            background-color: #000; 
+            color: white; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+
+        /* --- LOGIN CONTAINER --- */
+        .login-box { 
+            width: 100%; 
+            max-width: 350px; 
+            padding: 40px 30px; 
+            text-align: center; 
+            background: #111;
+            border-radius: 16px;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin-bottom: 10px; font-size: 2.5rem; letter-spacing: -1px; }
+        h1 span { color: #0d6efd; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 0.9rem; }
+
+        /* --- FORMS --- */
+        .input-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.85rem; font-weight: bold; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            background: #222; 
+            border: 1px solid #333; 
+            color: white; 
+            border-radius: 8px; 
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        input:focus { outline: none; border-color: #0d6efd; }
+
+        /* --- BUTTONS --- */
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            background: #0d6efd; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            font-size: 1rem; 
+            transition: background 0.2s;
+        }
+        button:hover { background: #0b5ed7; }
+        
+        button.secondary {
+            background: transparent;
+            border: 1px solid #333;
+            margin-top: 15px;
+            color: #aaa;
+        }
+        button.secondary:hover { border-color: #666; color: white; }
+
+        /* --- UTILS --- */
+        p { color: #aaa; margin-top: 25px; font-size: 0.9rem; }
+        a { color: #0d6efd; text-decoration: none; cursor: pointer; font-weight: bold; }
+        a:hover { text-decoration: underline; }
+        
+        .error { 
+            color: #ff2d55; 
+            background: rgba(255, 45, 85, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px; 
+            font-size: 0.9rem; 
+            display: none; 
+            border: 1px solid rgba(255, 45, 85, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-box">
+    <h1>Learn<span>Tok</span></h1>
+    <div class="subtitle" id="form-subtitle">Bite-sized learning for everyone.</div>
+    
+    <!-- LOGIN FORM -->
+    <div id="login-form">
+        <div class="input-group">
+            <label>Username</label>
+            <input type="text" id="l-user" placeholder="Enter your username">
+        </div>
+        <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="l-pass" placeholder="Enter your password">
+        </div>
+        
+        <button onclick="login()">Log In</button>
+        <div id="l-error" class="error"></div>
+        
+        <p>Don't have an account? <a onclick="toggleMode()">Sign Up</a></p>
+    </div>
+
+    <!-- SIGNUP FORM (Hidden by default) -->
+    <div id="signup-form" style="display:none;">
+        <div class="input-group">
+            <label>Choose Username</label>
+            <input type="text" id="s-user" placeholder="Pick a unique username">
+        </div>
+        <div class="input-group">
+            <label>Choose Password</label>
+            <input type="password" id="s-pass" placeholder="Create a strong password">
+        </div>
+        
+        <button onclick="register()">Create Account</button>
+        <div id="s-error" class="error"></div>
+        
+        <p>Already have an account? <a onclick="toggleMode()">Log In</a></p>
+    </div>
+</div>
+
+<script>
+    // --- TOGGLE BETWEEN LOGIN & SIGNUP ---
+    function toggleMode() {
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const subtitle = document.getElementById('form-subtitle');
+        const errors = document.querySelectorAll('.error');
+        
+        // Clear errors
+        errors.forEach(e => e.style.display = 'none');
+
+        if (loginForm.style.display === 'none') {
+            loginForm.style.display = 'block';
+            signupForm.style.display = 'none';
+            subtitle.innerText = "Bite-sized learning for everyone.";
+        } else {
+            loginForm.style.display = 'none';
+            signupForm.style.display = 'block';
+            subtitle.innerText = "Join the community today.";
+        }
+    }
+
+    // --- LOGIN LOGIC ---
+    async function login() {
+        const u = document.getElementById('l-user').value;
+        const p = document.getElementById('l-pass').value;
+        const err = document.getElementById('l-error');
+        const btn = document.querySelector('#login-form button');
+        
+        if(!u || !p) { 
+            showError(err, "Please fill in all fields."); 
+            return; 
+        }
+
+        btn.innerText = "Logging in...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                // Save session info
+                localStorage.setItem('user_id', data.user_id);
+                localStorage.setItem('username', data.username);
+                // Redirect to main app
+                window.location.href = '/';
+            } else {
+                showError(err, data.message || "Invalid credentials");
+            }
+        } catch(e) { 
+            showError(err, "Connection Error. Is the server running?"); 
+        } finally {
+            btn.innerText = "Log In";
+            btn.disabled = false;
+        }
+    }
+
+    // --- REGISTER LOGIC ---
+    async function register() {
+        const u = document.getElementById('s-user').value;
+        const p = document.getElementById('s-pass').value;
+        const err = document.getElementById('s-error');
+        const btn = document.querySelector('#signup-form button');
+        
+        if(!u || !p) { 
+            showError(err, "Please fill in all fields."); 
+            return; 
+        }
+
+        btn.innerText = "Creating Account...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                localStorage.setItem('user_id', data.user_id);
+                localStorage.setItem('username', data.username);
+                window.location.href = '/';
+            } else {
+                showError(err, data.message || "Username likely taken.");
+            }
+        } catch(e) { 
+            showError(err, "Connection Error. Is the server running?"); 
+        } finally {
+            btn.innerText = "Create Account";
+            btn.disabled = false;
+        }
+    }
+
+    function showError(element, message) {
+        element.innerText = message;
+        element.style.display = 'block';
+    }
+</script>
+</body>
+</html>
